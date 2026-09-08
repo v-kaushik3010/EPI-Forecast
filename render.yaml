@@ -31,7 +31,4 @@ services:
       --server.enableXsrfProtection=false
     envVars:
       - key: BACKEND_URL
-        fromService:
-          name: epi-forecast-api
-          type: web
-          property: hostport
+        value: https://epi-forecast-api.onrender.com
