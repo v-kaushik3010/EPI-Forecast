@@ -1,16 +1,27 @@
 services:
+  # ── Flask API (Backend) ──────────────────────────────────────────────────────
   - type: web
     name: epi-forecast-api
     runtime: python
     plan: free
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn backend.app:app
+    startCommand: gunicorn backend.app:app --workers 1 --timeout 120
+    healthCheckPath: /health
+    envVars:
+      - key: CACHE_TTL_SECONDS
+        value: 3600
+      - key: MAX_FORECAST_DAYS
+        value: 30
+      - key: LOG_LEVEL
+        value: INFO
+
+  # ── Streamlit Dashboard (Frontend) ───────────────────────────────────────────
   - type: web
     name: epi-forecast-dashboard
     runtime: python
     plan: free
     buildCommand: pip install -r requirements.txt
-    startCommand: streamlit run frontend/dashboard.py --server.port=$PORT --server.headless=true
+    startCommand: streamlit run frontend/dashboard.py --server.port=$PORT --server.headless=true --server.enableCORS=false
     envVars:
       - key: BACKEND_URL
         fromService:
