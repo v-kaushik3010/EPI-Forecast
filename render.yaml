@@ -31,4 +31,4 @@ services:
       --server.enableXsrfProtection=false
     envVars:
       - key: BACKEND_URL
-        value: https://epi-forecast-api.onrender.com
+        value: https://epi-forecast-api-160c.onrender.com
