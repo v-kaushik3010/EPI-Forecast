@@ -1,0 +1,22 @@
+{
+  "country": "uk",
+  "cached_at": "2026-09-08T09:03:39.552082+00:00",
+  "ttl_seconds": 3600,
+  "rows": 1129,
+  "pipeline_metadata": {
+    "extract": {
+      "source": "cache",
+      "country": "uk",
+      "rows_extracted": 1131,
+      "date_range": "2020-02-03 \u2192 2023-03-09",
+      "extracted_at": "2026-09-08T09:03:39.524741+00:00"
+    },
+    "transform": {
+      "rows_after_transform": 1129,
+      "negative_values_clipped": 3,
+      "outliers_corrected": 24,
+      "null_count": 0,
+      "date_range": "2020-02-05 \u2192 2023-03-09"
+    }
+  }
+}

@@ -1,5 +1,5 @@
-# ── Runtime cache (auto-generated, never commit) ──────────────────────────────
-data/cache/
+# ── Runtime cache temporary files ───────────────────────────────────────────
+data/cache/*.tmp
 
 # ── Environment secrets ───────────────────────────────────────────────────────
 .env

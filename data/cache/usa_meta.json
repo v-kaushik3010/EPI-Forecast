@@ -1,0 +1,22 @@
+{
+  "country": "usa",
+  "cached_at": "2026-09-08T09:03:39.335570+00:00",
+  "ttl_seconds": 3600,
+  "rows": 1134,
+  "pipeline_metadata": {
+    "extract": {
+      "source": "cache",
+      "country": "usa",
+      "rows_extracted": 1136,
+      "date_range": "2020-01-29 \u2192 2023-03-09",
+      "extracted_at": "2026-09-08T09:03:39.318080+00:00"
+    },
+    "transform": {
+      "rows_after_transform": 1134,
+      "negative_values_clipped": 1,
+      "outliers_corrected": 30,
+      "null_count": 0,
+      "date_range": "2020-01-31 \u2192 2023-03-09"
+    }
+  }
+}
