@@ -26,7 +26,6 @@ from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from sklearn.preprocessing import MinMaxScaler
-from werkzeug.middleware.proxy_fix import ProxyFix
 
 # ── Path Setup ────────────────────────────────────────────────────────────────
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -47,14 +46,12 @@ logger = logging.getLogger(__name__)
 
 # ── App & Extensions ─────────────────────────────────────────────────────────
 app = Flask(__name__)
-# Enable reverse proxy support for Render (X-Forwarded-For)
-app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 CORS(app)
 
 limiter = Limiter(
     get_remote_address,
     app=app,
-    default_limits=[os.environ.get("RATELIMIT_DEFAULT", "600 per minute")],
+    default_limits=["300 per minute"],
     storage_uri="memory://",
 )
 
@@ -187,7 +184,7 @@ def countries():
 # ── Predict ───────────────────────────────────────────────────────────────────
 
 @app.route("/predict")
-@limiter.limit(os.environ.get("RATELIMIT_PREDICT", "300 per minute"))
+@limiter.limit("120 per minute")
 def predict():
     """
     Generate an epidemic forecast.
@@ -247,7 +244,7 @@ def predict():
 # ── Compare ───────────────────────────────────────────────────────────────────
 
 @app.route("/compare")
-@limiter.limit(os.environ.get("RATELIMIT_COMPARE", "120 per minute"))
+@limiter.limit("30 per minute")
 def compare():
     """
     Run both LSTM and ARIMA, backtest each, and return a comparison report.

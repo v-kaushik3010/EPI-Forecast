@@ -187,14 +187,6 @@ def api(endpoint: str, **params):
     except requests.exceptions.ConnectionError:
         st.error("⚠️ Cannot connect to the backend API. Is the Flask server running?")
         return None
-    except requests.exceptions.HTTPError as http_err:
-        if r.status_code == 429:
-            st.warning("⚠️ Rate limit reached or backend busy (HTTP 429). Please wait a few seconds and refresh.")
-        elif r.status_code == 404:
-            st.error(f"⚠️ Endpoint not found (404) at `{url}`. If deployed on Render, ensure the `epi-forecast-api` service has been redeployed with the latest commit.")
-        else:
-            st.error(f"⚠️ API error ({r.status_code}): {http_err}")
-        return None
     except Exception as exc:
         st.error(f"⚠️ API error: {exc}")
         return None
@@ -814,7 +806,7 @@ with tab4:
 
     with st.spinner(f"Fetching forecasts for {len(selected)} countries..."):
         for i, c in enumerate(selected):
-            mc_data = get_forecast(c, compare_days, "lstm")
+            mc_data = api("predict", country=c, days=compare_days, model="lstm")
             if mc_data:
                 p = mc_data.get("predictions", [])
                 if p:

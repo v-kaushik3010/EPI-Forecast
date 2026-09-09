@@ -98,47 +98,29 @@ class DataPipeline:
         url = f"{DISEASE_SH_BASE}/historical/{country}?lastdays=all"
         logger.info("Fetching from disease.sh: country=%s", country)
 
-        try:
-            response = requests.get(url, timeout=15)
-            response.raise_for_status()
-            raw = response.json()
+        response = requests.get(url, timeout=15)
+        response.raise_for_status()
+        raw = response.json()
 
-            cases_dict = raw["timeline"]["cases"]
-            df = pd.DataFrame(
-                list(cases_dict.items()),
-                columns=["date", "cumulative_cases"]
-            )
-            df["date"] = pd.to_datetime(df["date"])
-            df = df.set_index("date").sort_index()
-            df["country"] = country
+        cases_dict = raw["timeline"]["cases"]
+        df = pd.DataFrame(
+            list(cases_dict.items()),
+            columns=["date", "cumulative_cases"]
+        )
+        df["date"] = pd.to_datetime(df["date"])
+        df = df.set_index("date").sort_index()
+        df["country"] = country
 
-            self._pipeline_meta["extract"] = {
-                "source": "disease.sh",
-                "url": url,
-                "country": country,
-                "rows_extracted": len(df),
-                "date_range": f"{df.index.min().date()} → {df.index.max().date()}",
-                "extracted_at": datetime.now(timezone.utc).isoformat(),
-            }
-            logger.info("Extracted %d rows for %s", len(df), country)
-            return df
-        except Exception as exc:
-            stale = self._load_cache(country, ignore_ttl=True)
-            if stale is not None:
-                logger.warning(
-                    "disease.sh request failed (%s). Serving stale cache for %s.",
-                    exc, country
-                )
-                self._pipeline_meta["extract"] = {
-                    "source": "cache_fallback",
-                    "country": country,
-                    "rows_extracted": len(stale),
-                    "date_range": f"{stale.index.min().date()} → {stale.index.max().date()}",
-                    "extracted_at": datetime.now(timezone.utc).isoformat(),
-                    "warning": f"disease.sh error ({exc}); used cached data",
-                }
-                return stale
-            raise
+        self._pipeline_meta["extract"] = {
+            "source": "disease.sh",
+            "url": url,
+            "country": country,
+            "rows_extracted": len(df),
+            "date_range": f"{df.index.min().date()} → {df.index.max().date()}",
+            "extracted_at": datetime.now(timezone.utc).isoformat(),
+        }
+        logger.info("Extracted %d rows for %s", len(df), country)
+        return df
 
     # ── Transform ─────────────────────────────────────────────────────────────
 
@@ -296,8 +278,8 @@ class DataPipeline:
             )
         return country
 
-    def _load_cache(self, country: str, ignore_ttl: bool = False) -> Optional[pd.DataFrame]:
-        """Load from JSON cache if TTL has not expired (or if ignore_ttl=True)."""
+    def _load_cache(self, country: str) -> Optional[pd.DataFrame]:
+        """Load from JSON cache if TTL has not expired."""
         cache_path = CACHE_DIR / f"{country}.json"
         meta_path  = CACHE_DIR / f"{country}_meta.json"
 
@@ -307,13 +289,12 @@ class DataPipeline:
         with open(meta_path) as f:
             meta = json.load(f)
 
-        if not ignore_ttl:
-            cached_at   = datetime.fromisoformat(meta["cached_at"])
-            age_seconds = (datetime.now(timezone.utc) - cached_at).total_seconds()
+        cached_at   = datetime.fromisoformat(meta["cached_at"])
+        age_seconds = (datetime.now(timezone.utc) - cached_at).total_seconds()
 
-            if age_seconds > meta["ttl_seconds"]:
-                logger.info("Cache EXPIRED for %s (age=%.0fs)", country, age_seconds)
-                return None
+        if age_seconds > meta["ttl_seconds"]:
+            logger.info("Cache EXPIRED for %s (age=%.0fs)", country, age_seconds)
+            return None
 
         df = pd.read_json(cache_path, orient="records")
         df["date"] = pd.to_datetime(df["date"])
