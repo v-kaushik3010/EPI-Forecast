@@ -99,6 +99,14 @@ def test_root_has_service_key(client):
     assert "endpoints" in data
 
 
+def test_ping_returns_200(client):
+    resp = client.get("/ping")
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data.get("status") == "ok"
+    assert data.get("pong") is True
+
+
 def test_health_returns_200(client):
     resp = client.get("/health")
     assert resp.status_code == 200

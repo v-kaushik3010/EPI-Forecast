@@ -177,19 +177,60 @@ PLOTLY_LAYOUT = dict(
 # Helpers
 # ─────────────────────────────────────────────────────────────────────────────
 
+DEFAULT_COUNTRIES = [
+    "argentina", "australia", "austria", "belgium", "brazil", "canada", "china",
+    "colombia", "czechia", "france", "germany", "india", "indonesia", "iran",
+    "israel", "italy", "japan", "mexico", "netherlands", "portugal", "russia",
+    "singapore", "spain", "sweden", "switzerland", "turkey", "uk", "ukraine", "usa"
+]
+
+
+class _FetchFailed(Exception):
+    """Internal sentinel exception to prevent st.cache_data from caching failed responses."""
+    pass
+
+
 def api(endpoint: str, **params):
-    """Call the backend API. Returns parsed JSON or None on error."""
-    try:
-        url = f"{_API_BASE}/{endpoint.lstrip('/')}"
-        r   = requests.get(url, params=params, timeout=TIMEOUT)
-        r.raise_for_status()
-        return r.json()
-    except requests.exceptions.ConnectionError:
-        st.error("⚠️ Cannot connect to the backend API. Is the Flask server running?")
-        return None
-    except Exception as exc:
-        st.error(f"⚠️ API error: {exc}")
-        return None
+    """
+    Call the backend API with automatic retry for Render free-tier cold starts.
+    Handles transient 502/503/504 errors and connection delays gracefully.
+    """
+    url = f"{_API_BASE}/{endpoint.lstrip('/')}"
+    max_retries = 3
+    backoff = [2, 4, 7]
+
+    for attempt in range(max_retries):
+        try:
+            r = requests.get(url, params=params, timeout=TIMEOUT)
+            if r.status_code == 200:
+                return r.json()
+            elif r.status_code in (502, 503, 504):
+                # Service is spinning up from Render free-tier standby
+                if attempt < max_retries - 1:
+                    time.sleep(backoff[attempt])
+                    continue
+                else:
+                    st.warning(
+                        "⏳ The backend service is currently waking up from standby on Render. "
+                        "Please wait a moment and refresh."
+                    )
+                    return None
+            else:
+                r.raise_for_status()
+                return r.json()
+        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
+            if attempt < max_retries - 1:
+                time.sleep(backoff[attempt])
+                continue
+            st.warning(
+                "⏳ Connecting to backend... If the service was inactive, it may take ~30s to boot on Render."
+            )
+            return None
+        except Exception as exc:
+            st.error(f"⚠️ API error: {exc}")
+            return None
+
+    return None
 
 
 def df_to_csv(df: pd.DataFrame) -> bytes:
@@ -242,34 +283,93 @@ def fmt(val, decimals=0):
 
 
 @st.cache_data(ttl=300, show_spinner=False)
-def get_countries():
+def _fetch_countries():
     data = api("countries")
-    return data.get("countries", []) if data else ["india", "usa", "brazil", "uk"]
+    if data and "countries" in data:
+        return data["countries"]
+    raise _FetchFailed()
+
+
+def get_countries():
+    try:
+        return _fetch_countries()
+    except _FetchFailed:
+        return DEFAULT_COUNTRIES
 
 
 @st.cache_data(ttl=300, show_spinner=False)
+def _fetch_forecast(country: str, days: int, model: str):
+    res = api("predict", country=country, days=days, model=model)
+    if not res:
+        raise _FetchFailed()
+    return res
+
+
 def get_forecast(country: str, days: int, model: str):
-    return api("predict", country=country, days=days, model=model)
+    try:
+        return _fetch_forecast(country, days, model)
+    except _FetchFailed:
+        return None
 
 
 @st.cache_data(ttl=300, show_spinner=False)
+def _fetch_features(country: str):
+    res = api("data/features", country=country)
+    if not res:
+        raise _FetchFailed()
+    return res
+
+
 def get_features(country: str):
-    return api("data/features", country=country)
+    try:
+        return _fetch_features(country)
+    except _FetchFailed:
+        return None
 
 
 @st.cache_data(ttl=300, show_spinner=False)
+def _fetch_compare(country: str, days: int):
+    res = api("compare", country=country, days=days)
+    if not res:
+        raise _FetchFailed()
+    return res
+
+
 def get_compare(country: str, days: int):
-    return api("compare", country=country, days=days)
+    try:
+        return _fetch_compare(country, days)
+    except _FetchFailed:
+        return None
 
 
 @st.cache_data(ttl=300, show_spinner=False)
+def _fetch_quality(country: str):
+    res = api("data/quality", country=country)
+    if not res:
+        raise _FetchFailed()
+    return res
+
+
 def get_quality(country: str):
-    return api("data/quality", country=country)
+    try:
+        return _fetch_quality(country)
+    except _FetchFailed:
+        return None
 
 
 @st.cache_data(ttl=300, show_spinner=False)
+def _fetch_stats(country: str):
+    res = api("data/stats", country=country)
+    if not res:
+        raise _FetchFailed()
+    return res
+
+
 def get_stats(country: str):
-    return api("data/stats", country=country)
+    try:
+        return _fetch_stats(country)
+    except _FetchFailed:
+        return None
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -344,6 +444,13 @@ with tab1:
         feat = get_features(country)
 
     if data is None:
+        st.warning(
+            "⏳ The backend API is waking up from standby on Render (free tier takes ~30s). "
+            "Please click **Retry Connection** once ready."
+        )
+        if st.button("🔄 Retry Connection", key="retry_tab1"):
+            st.cache_data.clear()
+            st.rerun()
         st.stop()
 
     preds    = data.get("predicted_cases_next_7_days") or data.get("predictions", [])
@@ -505,6 +612,9 @@ with tab2:
 
     if cmp_data is None:
         st.info("Model comparison requires the backend to be running.")
+        if st.button("🔄 Retry Connection", key="retry_tab2"):
+            st.cache_data.clear()
+            st.rerun()
         st.stop()
 
     lstm_block  = cmp_data.get("lstm",  {})
@@ -656,6 +766,9 @@ with tab3:
 
     if feat_data is None:
         st.info("Data Explorer requires the backend to be running.")
+        if st.button("🔄 Retry Connection", key="retry_tab3"):
+            st.cache_data.clear()
+            st.rerun()
         st.stop()
 
     feat_summary  = feat_data.get("feature_summary", {})

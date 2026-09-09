@@ -5,8 +5,8 @@ services:
     runtime: python
     plan: free
     buildCommand: pip install -r requirements.txt --prefer-binary
-    startCommand: gunicorn backend.app:app --workers 1 --timeout 120 --bind 0.0.0.0:$PORT
-    healthCheckPath: /health
+    startCommand: gunicorn --preload backend.app:app --workers 1 --timeout 120 --bind 0.0.0.0:$PORT
+    healthCheckPath: /ping
     envVars:
       - key: CACHE_TTL_SECONDS
         value: 3600

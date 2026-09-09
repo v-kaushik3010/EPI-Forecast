@@ -147,6 +147,7 @@ def root():
             "arima": "available (statsmodels)",
         },
         "endpoints": {
+            "GET /ping":            "Ultra-lightweight keep-alive / health check",
             "GET /health":          "Service & model health check",
             "GET /countries":       "Supported countries list",
             "GET /predict":         "LSTM or ARIMA forecast with confidence intervals",
@@ -158,11 +159,19 @@ def root():
     })
 
 
+# ── Ping ──────────────────────────────────────────────────────────────────────
+
+@app.route("/ping")
+def ping():
+    """Zero-overhead keep-alive and health-check endpoint."""
+    return jsonify({"status": "ok", "pong": True})
+
+
 # ── Health ────────────────────────────────────────────────────────────────────
 
 @app.route("/health")
 def health():
-    """Lightweight health check — suitable for Render's healthCheckPath."""
+    """Lightweight health check — reports service and model status."""
     return jsonify({
         "status":     "ok",
         "lstm":       "loaded" if lstm_model else "error",
